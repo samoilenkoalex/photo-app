@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:photo_app/features/photo/repositories/photo_repository.dart';
 
-import '../../features/photo/services/photo_api_service.dart';
+import '../../features/upload/repositories/upload_repository.dart';
+import '../../features/upload/services/upload_photo_queue.dart';
 
 class RepositoriesHolder extends StatelessWidget {
   final Widget child;
@@ -17,8 +17,8 @@ class RepositoriesHolder extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider<PhotoRepository>(
-          create: (context) => PhotoRepositoryImpl(photoApiService: GetIt.I.get<PhotoApiService>()),
+        RepositoryProvider<UploadRepository>(
+          create: (context) => UploadRepositoryImpl(uploadPhotoQueueService: GetIt.I.get<UploadPhotoQueueService>()),
         ),
       ],
       child: child,
