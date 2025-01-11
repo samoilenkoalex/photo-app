@@ -7,22 +7,34 @@ class CameraService {
   bool _isCapturing = false;
 
   CameraController? get controller => _controller;
-
   Future<void>? get initializeFuture => _initializeFuture;
 
   Future<void> initialize() async {
+    if (_controller != null) return;
+
     try {
       final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw CameraException(
+          'No cameras found',
+          'No cameras available on this device',
+        );
+      }
+
       _controller = CameraController(
         cameras[0],
         ResolutionPreset.max,
         enableAudio: false,
       );
+
       _initializeFuture = _controller!.initialize();
       await _initializeFuture;
       log('Camera initialized successfully');
     } catch (e) {
       log('Failed to initialize camera: $e');
+      _controller?.dispose();
+      _controller = null;
+      _initializeFuture = null;
       throw CameraException('Failed to initialize camera', e.toString());
     }
   }
