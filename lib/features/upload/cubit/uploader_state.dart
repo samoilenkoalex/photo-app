@@ -2,6 +2,13 @@ import 'package:equatable/equatable.dart';
 
 enum ConnectionStatus { connected, disconnected, uploading }
 
+extension ConnectionStatusText on ConnectionStatus {
+  String getStatusText() => switch (this) {
+    ConnectionStatus.connected => 'Connected',
+    ConnectionStatus.disconnected => 'No Internet',
+    ConnectionStatus.uploading => 'Uploading...',
+  };
+}
 class UploaderState extends Equatable {
   final List<String> queue;
   final List<String> failedUploads;
