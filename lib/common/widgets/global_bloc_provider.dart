@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:photo_app/features/camera/services/location_service.dart';
 
 import '../../features/camera/cubit/photo_taker_cubit.dart';
 import '../../features/permission/cubit/permission_cubit.dart';
@@ -27,7 +29,9 @@ class GlobalBlocProvider extends StatelessWidget {
           ),
         ),
         BlocProvider(
-          create: (context) => PhotoTakerCubit(),
+          create: (context) => PhotoTakerCubit(
+            locationService: GetIt.I.get<LocationService>(),
+          ),
         ),
       ],
       child: child,
