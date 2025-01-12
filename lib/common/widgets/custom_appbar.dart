@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../features/upload/cubit/photo_taker_cubit.dart';
+import '../../features/camera/cubit/photo_taker_cubit.dart';
 import '../../features/upload/cubit/uploader_cubit.dart';
 import '../../features/upload/cubit/uploader_state.dart';
 import '../../theme/theme.dart';

@@ -8,12 +8,23 @@ import '../../../network/network.dart';
 import '../repositories/upload_repository.dart';
 import 'uploader_state.dart';
 
+/// A Cubit that manages the state of photo uploads and network connectivity.
+/// Handles queuing of photos, processing uploads, and monitoring network status.
 class UploaderCubit extends Cubit<UploaderState> {
+  // Repository responsible for handling upload operations
   final UploadRepository _uploadRepository;
 
+  // Service to monitor network connectivity status
   final Connectivity _connectivity;
-  StreamSubscription? _connectivitySubscription;
 
+  // Subscription to connectivity changes stream
+  StreamSubscription<dynamic>? _connectivitySubscription;
+
+  /// Creates a new UploaderCubit instance.
+  ///
+  /// Parameters:
+  /// - uploadRepository: Required repository for managing uploads
+  /// - connectivity: Optional connectivity service (will create new instance if not provided)
   UploaderCubit({
     required UploadRepository uploadRepository,
     Connectivity? connectivity,
@@ -23,67 +34,85 @@ class UploaderCubit extends Cubit<UploaderState> {
     _initConnectivity();
   }
 
+  /// Initializes connectivity monitoring and sets up listeners for network changes.
+  /// Called automatically when the Cubit is created.
   Future<void> _initConnectivity() async {
     // Check initial connectivity status
     final initialResult = await _connectivity.checkConnectivity();
-    if (initialResult != ConnectivityResult.none) {
+    if (initialResult != [ConnectivityResult.none]) {
       emit(state.copyWith(connectionStatus: ConnectionStatus.connected));
     }
 
-    // Listen for connectivity changes
+    // Set up listener for future connectivity changes
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) async {
+      // Check if device has either WiFi or mobile data connection
       if (results.contains(ConnectivityResult.wifi) || results.contains(ConnectivityResult.mobile)) {
         emit(state.copyWith(connectionStatus: ConnectionStatus.connected));
+        // If there are pending uploads, process them when connection is restored
         if (state.queue.isNotEmpty) {
           await processQueue();
         }
       } else {
+        // Update state to reflect disconnected status
         emit(state.copyWith(connectionStatus: ConnectionStatus.disconnected));
       }
     });
   }
 
+  /// Adds new photos to the upload queue and initiates processing if connected.
+  ///
+  /// Parameters:
+  /// - photo: String identifier or path of the photo to be uploaded
   Future<void> addPhotos(String photo) async {
+    // Add photo to the repository's queue
     _uploadRepository.addToQueue(photo);
 
+    // Check current connectivity status
     final currentConnectivity = await _connectivity.checkConnectivity();
-    final hasConnection = currentConnectivity != ConnectivityResult.none;
+    final hasConnection = currentConnectivity != [ConnectivityResult.none];
 
+    // Update state with new queue info and connection status
     emit(
       state.copyWith(
         queue: _uploadRepository.queue,
         isUploading: true,
         connectionStatus: hasConnection ? ConnectionStatus.uploading : ConnectionStatus.disconnected,
-        totalPhotos: state.totalPhotos + 1, // Increment total photos
+        totalPhotos: state.totalPhotos + 1, // Track total number of photos added
       ),
     );
 
+    // If connected, begin processing the queue
     if (hasConnection) {
       await processQueue();
     }
   }
 
+  /// Processes the upload queue, handling both successful and failed uploads.
+  /// Updates state accordingly and manages connection status throughout the process.
   Future<void> processQueue() async {
+    // Guard clause: exit if not currently uploading
     if (!state.isUploading) return;
 
+    // Update state to show upload in progress
     emit(state.copyWith(connectionStatus: ConnectionStatus.uploading));
 
     try {
+      // Attempt to process the next item in the queue
       final result = await _uploadRepository.processUploadQueue();
 
       if (result != null) {
         if (result.status == Status.completed) {
-          // Successful upload
+          // Handle successful upload
           emit(
             state.copyWith(
-              queue: _uploadRepository.queue, // Get updated queue
+              queue: _uploadRepository.queue, // Update queue state
               successfulUploads: state.successfulUploads + 1,
               isUploading: _uploadRepository.queue.isNotEmpty,
             ),
           );
           log('Successful upload - Updated count: ${state.successfulUploads + 1}');
         } else {
-          // Failed upload
+          // Handle failed upload
           emit(
             state.copyWith(
               queue: _uploadRepository.queue,
@@ -94,13 +123,14 @@ class UploaderCubit extends Cubit<UploaderState> {
         }
       }
 
-      // Update connection status
+      // Update connection status based on queue state
       emit(
         state.copyWith(
           connectionStatus: _uploadRepository.queue.isEmpty ? ConnectionStatus.connected : ConnectionStatus.uploading,
         ),
       );
     } catch (e) {
+      // Log any errors and update state
       log('Process queue error: $e');
       emit(
         state.copyWith(
@@ -111,6 +141,7 @@ class UploaderCubit extends Cubit<UploaderState> {
     }
   }
 
+  /// Cleanup method to cancel connectivity subscription when Cubit is closed.
   @override
   Future<void> close() {
     _connectivitySubscription?.cancel();

@@ -16,9 +16,9 @@ Future<void> showPermissionBottomSheet(BuildContext context) {
     context: context,
     isDismissible: false,
     backgroundColor: Colors.transparent,
-    builder: (BuildContext context) => WillPopScope(
-      onWillPop: () async => false,
-      child: const PermissionBottomSheet(),
+    builder: (BuildContext context) => const PopScope(
+      canPop: false,
+      child: PermissionBottomSheet(),
     ),
   );
 }

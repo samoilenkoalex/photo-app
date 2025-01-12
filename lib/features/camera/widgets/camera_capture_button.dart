@@ -21,7 +21,7 @@ class CameraCaptureButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withAlpha(204),
             width: 10,
           ),
         ),

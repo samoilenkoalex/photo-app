@@ -8,8 +8,8 @@ import '../../permission/cubit/permission_cubit.dart';
 import '../../permission/cubit/permission_state.dart';
 import '../../permission/dialogs/dialogs.dart';
 import '../../permission/utils/permission_util.dart';
-import '../../upload/cubit/photo_taker_cubit.dart';
-import '../../upload/cubit/photo_taker_state.dart';
+import '../cubit/photo_taker_cubit.dart';
+import '../cubit/photo_taker_state.dart';
 import '../widgets/camera_capture_button.dart';
 
 class CameraScreen extends StatefulWidget {
