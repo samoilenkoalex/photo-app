@@ -28,7 +28,7 @@ class _PermissionBottomSheetState extends State<PermissionBottomSheet> with Widg
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.resumed) {
-      final isPermissionGranted = await requestCameraPermissionStatus();
+      final isPermissionGranted = await checkCameraPermissionStatus();
 
       if (isPermissionGranted && mounted) {
         Navigator.of(context).pop();

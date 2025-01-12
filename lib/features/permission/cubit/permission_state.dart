@@ -7,20 +7,24 @@ enum PermissionStatus {
 }
 
 class PermissionState extends Equatable {
-  final PermissionStatus status;
+  final PermissionStatus cameraPermissionStatus;
+  final PermissionStatus locationPermissionStatus;
 
   const PermissionState({
-    this.status = PermissionStatus.initial,
+    this.cameraPermissionStatus = PermissionStatus.initial,
+    this.locationPermissionStatus = PermissionStatus.initial,
   });
 
   PermissionState copyWith({
-    PermissionStatus? status,
+    PermissionStatus? cameraPermissionStatus,
+    PermissionStatus? locationPermissionStatus,
   }) {
     return PermissionState(
-      status: status ?? this.status,
+      cameraPermissionStatus: cameraPermissionStatus ?? this.cameraPermissionStatus,
+      locationPermissionStatus: locationPermissionStatus ?? this.locationPermissionStatus,
     );
   }
 
   @override
-  List<Object?> get props => [status];
+  List<Object?> get props => [cameraPermissionStatus, locationPermissionStatus];
 }
