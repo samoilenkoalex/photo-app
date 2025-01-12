@@ -5,7 +5,6 @@ import 'package:permission_handler/permission_handler.dart';
 Future<bool> requestCameraPermissionStatus() async {
   const permission = Permission.camera;
   final status = await permission.status;
-
   if (status.isGranted || status.isLimited) {
     log('Camera permission granted');
     return true;
@@ -16,9 +15,4 @@ Future<bool> requestCameraPermissionStatus() async {
     log('Camera permission status: $status');
     return false;
   }
-}
-
-Future<void> requestCameraPermission() async {
-  const permission = Permission.camera;
-  await permission.request();
 }
