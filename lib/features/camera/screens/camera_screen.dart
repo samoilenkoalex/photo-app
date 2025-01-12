@@ -98,9 +98,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                           bgColor: state.isCapturing ? Colors.grey : primaryButtonColor,
                           iconColor: state.isCapturing ? Colors.black54 : Colors.white,
                           onButtonTap: () {
-                            if (state.isCapturing) {
-                              context.read<PhotoTakerCubit>().takePicture();
-                            }
+                            context.read<PhotoTakerCubit>().takePicture();
                           },
                         ),
                     ],

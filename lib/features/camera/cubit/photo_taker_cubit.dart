@@ -2,33 +2,37 @@ import 'dart:developer';
 
 import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:native_exif/native_exif.dart';
 import 'package:photo_app/features/camera/cubit/photo_taker_state.dart';
 
-/// A Cubit that manages the state and functionality of a camera-based photo taking feature.
-/// Handles camera initialization, photo capture, and maintains a list of captured photos.
+import '../services/location_service.dart';
+
+/// A Cubit that manages the state and functionality of a camera-based photo taking system.
+/// Handles camera initialization, photo capture, GPS location tagging, and photo management.
 class PhotoTakerCubit extends Cubit<PhotoTakerState> {
-  // Controller for managing camera operations
+  LocationService locationService;
+
+  // Controller for accessing and controlling the device's camera
   CameraController? _controller;
 
-  // Future that completes when camera is initialized
+  // Future that completes when the camera controller is fully initialized
   Future<void>? _initializeControllerFuture;
 
-  // Flag to prevent multiple simultaneous captures
+  // Flag to prevent multiple simultaneous photo capture operations
   bool _isCapturing = false;
 
-  /// Creates a new instance of PhotoTakerCubit with initial empty state
-  PhotoTakerCubit() : super(const PhotoTakerState());
+  /// Creates a new instance of PhotoTakerCubit with an initial empty state
+  PhotoTakerCubit({required this.locationService}) : super(const PhotoTakerState());
 
   /// Initializes the camera by:
   /// 1. Getting available cameras
-  /// 2. Setting up controller with the first camera (usually back camera)
-  /// 3. Configuring camera settings (max resolution, no audio)
-  /// 4. Updating state with controller and initialization future
+  /// 2. Creating a controller for the first (usually back) camera
+  /// 3. Setting up the camera with maximum resolution and no audio
   Future<void> initializeCamera() async {
     try {
       final cameras = await availableCameras();
       _controller = CameraController(
-        cameras[0], // Use the first available camera
+        cameras[0], // Use the first available camera (usually back camera)
         ResolutionPreset.max, // Use maximum resolution
         enableAudio: false, // Disable audio as it's not needed for photos
       );
@@ -45,9 +49,11 @@ class PhotoTakerCubit extends Cubit<PhotoTakerState> {
     }
   }
 
-  /// Captures a photo using the initialized camera.
-  /// Prevents multiple simultaneous captures using _isCapturing flag.
-  /// Updates state with the new photo path and adds it to the photos list.
+  /// Takes a picture and processes it by:
+  /// 1. Capturing the image
+  /// 2. Getting current GPS location
+  /// 3. Writing GPS data to image EXIF metadata
+  /// 4. Adding the photo to the state
   Future<void> takePicture() async {
     if (_isCapturing) return; // Prevent multiple simultaneous captures
 
@@ -55,12 +61,30 @@ class PhotoTakerCubit extends Cubit<PhotoTakerState> {
       _isCapturing = true;
       emit(state.copyWith(isCapturing: true));
 
-      // Ensure camera is initialized before capturing
+      // Wait for camera initialization to complete
       await _initializeControllerFuture;
-      final image = await _controller!.takePicture();
 
-      // Add new photo to the list of captured photos
+      // Get current GPS position and capture the image
+      final position = await locationService.getCurrentPosition();
+      final image = await _controller!.takePicture();
+      final exif = await Exif.fromPath(image.path);
+      // Format the current time for GPS timestamp
+      final now = DateTime.now().toUtc();
+      final gpsTimeStamp = '${now.hour}:${now.minute}:${now.second}';
+      // Add GPS metadata to the image
+      await exif.writeAttributes({
+        'GPSLatitude': position.latitude.abs(),
+        'GPSLongitude': position.longitude.abs(),
+        'GPSTimeStamp': gpsTimeStamp,
+        'GPSDateStamp': '${now.year}:${now.month.toString().padLeft(2, '0')}:${now.day.toString().padLeft(2, '0')}',
+      });
+
+      // Verify EXIF data was written correctly
+      await exif.close();
+
+      // Add the new photo to the list of captured photos
       final updatedPhotos = List<String>.from(state.photos)..add(image.path);
+
       emit(
         state.copyWith(
           photos: updatedPhotos,
@@ -72,13 +96,11 @@ class PhotoTakerCubit extends Cubit<PhotoTakerState> {
       log('Error taking picture: $e');
       emit(state.copyWith(error: e.toString(), isCapturing: false));
     } finally {
-      _isCapturing = false; // Reset capturing flag regardless of success/failure
+      _isCapturing = false; // Ensure capturing flag is reset even if there's an error
     }
   }
 
-  /// Adds an existing photo path to the list of photos.
-  /// Useful for adding photos from external sources or restoring saved photos.
-  /// [photo] The file path of the photo to add
+  /// Adds a single photo to the state
   void addPhotos(String photo) {
     final updatedPhotos = List<String>.from(state.photos)..add(photo);
     emit(
@@ -89,15 +111,15 @@ class PhotoTakerCubit extends Cubit<PhotoTakerState> {
     );
   }
 
-  /// Clears all photos from the state, resetting to an empty list
+  /// Clears all photos from the state
   void clearPhotos() {
     emit(state.copyWith(photos: []));
   }
 
-  /// Properly disposes of camera resources when the cubit is closed
+  /// Disposes of the camera controller when the cubit is closed
   @override
   Future<void> close() {
-    _controller?.dispose(); // Release camera resources
+    _controller?.dispose();
     return super.close();
   }
 }
