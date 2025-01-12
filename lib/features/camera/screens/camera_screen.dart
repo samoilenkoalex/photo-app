@@ -7,7 +7,6 @@ import '../../../theme/theme.dart';
 import '../../permission/cubit/permission_cubit.dart';
 import '../../permission/cubit/permission_state.dart';
 import '../../permission/dialogs/dialogs.dart';
-import '../../permission/utils/permission_util.dart';
 import '../cubit/photo_taker_cubit.dart';
 import '../cubit/photo_taker_state.dart';
 import '../widgets/camera_capture_button.dart';
@@ -26,21 +25,24 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initializeCamera();
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      context.read<PhotoTakerCubit>().initializeCamera();
+  Future<void> _initializeCamera() async {
+    await context.read<PhotoTakerCubit>().initializeCamera();
+    if (mounted) {
+      await context.read<PermissionCubit>().checkCameraPermission();
+    }
+  }
 
-      final isPermissionGranted = await requestCameraPermissionStatus();
-      if (isPermissionGranted) {
-        setState(() {
-          _showButton = true;
-        });
-      } else {
-        if (mounted) {
-          await showAccessDialog(context);
-        }
+  @override
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.resumed) {
+      await context.read<PermissionCubit>().checkCameraPermission();
+      if (mounted && context.read<PermissionCubit>().state.status == PermissionStatus.granted) {
+        await context.read<PhotoTakerCubit>().initializeCamera();
       }
-    });
+    }
   }
 
   @override
@@ -50,34 +52,40 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   }
 
   @override
-  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
-    if (state == AppLifecycleState.resumed) {
-      final isPermissionGranted = await requestCameraPermissionStatus();
-      if (isPermissionGranted && mounted) {
-        context.read<PhotoTakerCubit>().initializeCamera();
-        setState(() {
-          _showButton = true;
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocListener<PermissionCubit, PermissionState>(
-      listenWhen: (previous, current) => previous.status != current.status && current.status == PermissionStatus.denied,
-      listener: (context, state) {
-        showPermissionBottomSheet(context);
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<PermissionCubit, PermissionState>(
+          listener: (context, state) async {
+            switch (state.status) {
+              case PermissionStatus.granted:
+                if (mounted) {
+                  setState(() {
+                    _showButton = true;
+                  });
+                }
+              case PermissionStatus.denied:
+                await showAccessDialog(context);
+                if (context.mounted) {
+                  showPermissionBottomSheet(context);
+                }
+
+              case PermissionStatus.initial:
+                break;
+            }
+          },
+        ),
+      ],
       child: BlocBuilder<PhotoTakerCubit, PhotoTakerState>(
         builder: (context, state) {
-          if (state.controller == null || state.initializeControllerFuture == null) {
+          final cubit = context.read<PhotoTakerCubit>();
+          final controller = cubit.controller;
+
+          if (controller == null || !state.isInitialized) {
             return const Scaffold(
               backgroundColor: Colors.black,
               body: Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                ),
+                child: CircularProgressIndicator(color: Colors.white),
               ),
             );
           }
@@ -85,32 +93,17 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           return Scaffold(
             backgroundColor: Colors.black,
             appBar: const CustomAppBar(),
-            body: FutureBuilder<void>(
-              future: state.initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CameraPreview(state.controller!),
-                      if (_showButton)
-                        CameraCaptureButton(
-                          bgColor: state.isCapturing ? Colors.grey : primaryButtonColor,
-                          iconColor: state.isCapturing ? Colors.black54 : Colors.white,
-                          onButtonTap: () {
-                            context.read<PhotoTakerCubit>().takePicture();
-                          },
-                        ),
-                    ],
-                  );
-                } else {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
-                  );
-                }
-              },
+            body: Stack(
+              alignment: Alignment.center,
+              children: [
+                CameraPreview(controller),
+                if (_showButton)
+                  CameraCaptureButton(
+                    bgColor: state.isCapturing ? Colors.grey : primaryButtonColor,
+                    iconColor: state.isCapturing ? Colors.black54 : Colors.white,
+                    onButtonTap: () => cubit.takePicture(),
+                  ),
+              ],
             ),
           );
         },
