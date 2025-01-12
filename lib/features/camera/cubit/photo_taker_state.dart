@@ -1,18 +1,19 @@
 import 'package:equatable/equatable.dart';
+import 'package:geolocator/geolocator.dart';
 
 class PhotoTakerState extends Equatable {
   final List<String> photos;
   final String? newPhoto;
   final String? error;
   final bool isCapturing;
-  final bool isInitialized; //check if controller is initialized
+  final Position? currentLocation;
 
   const PhotoTakerState({
     this.photos = const [],
     this.newPhoto,
     this.error,
     this.isCapturing = false,
-    this.isInitialized = false,
+    this.currentLocation,
   });
 
   PhotoTakerState copyWith({
@@ -20,14 +21,14 @@ class PhotoTakerState extends Equatable {
     String? newPhoto,
     String? error,
     bool? isCapturing,
-    bool? isInitialized,
+    Position? currentLocation,
   }) {
     return PhotoTakerState(
       photos: photos ?? this.photos,
       newPhoto: newPhoto ?? this.newPhoto,
       error: error ?? this.error,
       isCapturing: isCapturing ?? this.isCapturing,
-      isInitialized: isInitialized ?? this.isInitialized,
+      currentLocation: currentLocation ?? this.currentLocation,
     );
   }
 
@@ -37,6 +38,6 @@ class PhotoTakerState extends Equatable {
         newPhoto,
         error,
         isCapturing,
-        isInitialized,
+        currentLocation,
       ];
 }
