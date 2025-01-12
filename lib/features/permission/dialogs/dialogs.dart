@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:photo_app/features/check_permission/dialogs/widgets/access_dialog.dart';
+import 'package:photo_app/features/permission/dialogs/widgets/access_dialog.dart';
 
 import 'widgets/permission_bottom_sheet.dart';
 
@@ -12,10 +12,13 @@ Future<bool?> showAccessDialog(BuildContext context) {
 }
 
 Future<void> showPermissionBottomSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showModalBottomSheet(
     context: context,
     isDismissible: false,
     backgroundColor: Colors.transparent,
-    builder: (BuildContext context) => const PermissionBottomSheet(),
+    builder: (BuildContext context) => WillPopScope(
+      onWillPop: () async => false,
+      child: const PermissionBottomSheet(),
+    ),
   );
 }

@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../theme/theme.dart';
 import '../../constants/strings.dart';
 import '../../cubit/permission_cubit.dart';
-import '../../utils/permission_util.dart';
 import '../dialogs.dart';
 
 class AccessDialog extends StatelessWidget {
@@ -69,12 +68,6 @@ class AccessDialog extends StatelessWidget {
   }
 
   Future<void> _handleAllowPress(BuildContext context) async {
-    final status = await requestCameraPermissionStatus();
-
-    if (!status) {
-      await requestCameraPermission();
-    }
-
     if (context.mounted) {
       await context.read<PermissionCubit>().checkCameraPermission();
     }

@@ -1,14 +1,46 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../theme/theme.dart';
 import '../../constants/strings.dart';
+import '../../utils/permission_util.dart';
 
-class PermissionBottomSheet extends StatelessWidget {
+class PermissionBottomSheet extends StatefulWidget {
   const PermissionBottomSheet({super.key});
 
   @override
+  State<PermissionBottomSheet> createState() => _PermissionBottomSheetState();
+}
+
+class _PermissionBottomSheetState extends State<PermissionBottomSheet> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.resumed) {
+      final isPermissionGranted = await requestCameraPermissionStatus();
+
+      if (isPermissionGranted && mounted) {
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Your existing build method stays the same
     return Container(
       decoration: const BoxDecoration(
         color: Colors.black,
@@ -34,7 +66,9 @@ class PermissionBottomSheet extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: openAppSettings,
+              onPressed: () async {
+                await openAppSettings();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryButtonColor,
                 padding: const EdgeInsets.symmetric(vertical: 16),
