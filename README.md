@@ -7,6 +7,19 @@
 
 A Flutter application for capturing and uploading photos with offline support and automatic retry capabilities.
 
+## Preview
+
+**Internet connected**
+
+https://github.com/user-attachments/assets/9b77276b-26e4-45bc-a742-44d6234f41ea
+
+
+**Internet disconnected**
+
+https://github.com/user-attachments/assets/1bcbc096-6921-4abb-a32a-f0b90109c669
+
+
+
 ## Features
 
 -   **Photo Capture**
