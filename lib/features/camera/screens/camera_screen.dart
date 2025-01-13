@@ -86,6 +86,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       listeners: [
         BlocListener<PermissionCubit, PermissionState>(
           listener: (context, state) async {
+            log('STATE>>>>>>> ${state.isAccessDialogTapped}');
             await context.read<PermissionCubit>().checkLocationPermission();
             if (state.locationPermissionStatus == PermissionStatus.granted && context.mounted) {
               await context.read<PhotoTakerCubit>().getCurrentLocation();
@@ -134,7 +135,9 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       case PermissionStatus.granted:
         await _handleCameraGrantedPermission(state);
       case PermissionStatus.denied:
-        await _handleCameraDeniedPermission();
+        if (state.isAccessDialogTapped) {
+          await _handleCameraDeniedPermission();
+        }
       case PermissionStatus.initial:
         return;
     }

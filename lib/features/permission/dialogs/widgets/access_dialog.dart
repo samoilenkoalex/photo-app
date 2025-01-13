@@ -68,16 +68,22 @@ class AccessDialog extends StatelessWidget {
   }
 
   Future<void> _handleAllowPress(BuildContext context) async {
+    await context.read<PermissionCubit>().checkCameraPermission();
+
     if (context.mounted) {
-      await context.read<PermissionCubit>().checkCameraPermission();
+      await context.read<PermissionCubit>().useAccessDialog();
     }
+
     if (context.mounted) {
       Navigator.of(context).pop(true);
     }
   }
 
   Future<void> _handleCancelPress(BuildContext context) async {
-    await context.read<PermissionCubit>().checkCameraPermission();
+    await context.read<PermissionCubit>().useAccessDialog();
+    if (context.mounted) {
+      await context.read<PermissionCubit>().checkCameraPermission();
+    }
     if (context.mounted) {
       Navigator.of(context).pop();
       showPermissionBottomSheet(context);

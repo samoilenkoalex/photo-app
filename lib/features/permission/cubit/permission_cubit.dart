@@ -7,6 +7,7 @@ class PermissionCubit extends Cubit<PermissionState> {
   PermissionCubit() : super(const PermissionState());
 
   Future<void> checkCameraPermission() async {
+
     final isGranted = await checkCameraPermissionStatus();
     emit(
       state.copyWith(
@@ -23,7 +24,16 @@ class PermissionCubit extends Cubit<PermissionState> {
       ),
     );
   }
+
   Future<void> requestLocationPermissionDialog() async {
     await requestLocationPermission();
+  }
+
+  Future<void> useAccessDialog() async {
+    emit(
+      state.copyWith(
+        isAccessDialogTapped: true,
+      ),
+    );
   }
 }
