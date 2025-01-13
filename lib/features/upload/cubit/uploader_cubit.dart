@@ -32,6 +32,7 @@ class UploaderCubit extends Cubit<UploaderState> {
         _connectivity = connectivity ?? Connectivity(),
         super(const UploaderState()) {
     _initConnectivity();
+    _uploadRepository.onUploadSuccess = _handleUploadSuccess;
   }
 
   /// Initializes connectivity monitoring and sets up listeners for network changes.
@@ -39,7 +40,7 @@ class UploaderCubit extends Cubit<UploaderState> {
   Future<void> _initConnectivity() async {
     // Check initial connectivity status
     final initialResult = await _connectivity.checkConnectivity();
-    if (initialResult != [ConnectivityResult.none]) {
+    if (!initialResult.contains(ConnectivityResult.none)) {
       emit(state.copyWith(connectionStatus: ConnectionStatus.connected));
     }
 
@@ -59,6 +60,16 @@ class UploaderCubit extends Cubit<UploaderState> {
     });
   }
 
+  /// Handles successful upload of a single photo
+  void _handleUploadSuccess(String path) {
+    emit(
+      state.copyWith(
+        successfulUploads: state.successfulUploads + 1,
+      ),
+    );
+    log('Updated successful uploads count: ${state.successfulUploads}');
+  }
+
   /// Adds new photos to the upload queue and initiates processing if connected.
   ///
   /// Parameters:
@@ -69,7 +80,7 @@ class UploaderCubit extends Cubit<UploaderState> {
 
     // Check current connectivity status
     final currentConnectivity = await _connectivity.checkConnectivity();
-    final hasConnection = currentConnectivity != [ConnectivityResult.none];
+    final hasConnection = !currentConnectivity.contains(ConnectivityResult.none);
 
     // Update state with new queue info and connection status
     emit(
@@ -104,11 +115,9 @@ class UploaderCubit extends Cubit<UploaderState> {
           emit(
             state.copyWith(
               queue: _uploadRepository.queue,
-              successfulUploads: state.successfulUploads + result.successCount,
               isUploading: _uploadRepository.queue.isNotEmpty,
             ),
           );
-          log('Successful uploads - Updated count: ${state.successfulUploads + result.successCount}');
         } else {
           emit(
             state.copyWith(

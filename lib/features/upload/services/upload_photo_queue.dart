@@ -39,10 +39,14 @@ class UploadPhotoQueueService {
   /// Flag indicating if an upload is currently in progress
   bool _isUploading = false;
 
+  /// Callback for successful uploads
+  void Function(String path)? onUploadSuccess;
+
   UploadPhotoQueueService({
     ApiClient? httpService,
     int maxRetries = 5,
     Duration? retryDelay,
+    this.onUploadSuccess,
   })  : _httpService = httpService ?? ApiClient(baseUrl: 'https://prioritysoftfile-upload-testap-production.up.railway.app'),
         _maxRetries = maxRetries,
         _retryDelay = retryDelay ?? const Duration(seconds: 2) {
@@ -127,6 +131,8 @@ class UploadPhotoQueueService {
           successCount++;
           _queue.remove(photo);
           await _persistQueue(); // Persist after each successful upload
+          onUploadSuccess?.call(photo); // Notify about individual success
+          log('Successfully uploaded photo: ${photo.split('/').last}');
         } else {
           break; // Stop processing on first failure
         }

@@ -18,7 +18,7 @@ class RepositoriesHolder extends StatelessWidget {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<UploadRepository>(
-          create: (context) => UploadRepositoryImpl(uploadPhotoQueueService: GetIt.I.get<UploadPhotoQueueService>()),
+          create: (context) => UploadRepositoryImpl(uploadPhotoQueueService: GetIt.I<UploadPhotoQueueService>()),
         ),
       ],
       child: child,

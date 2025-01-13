@@ -13,13 +13,30 @@ abstract class UploadRepository {
   List<String> get queue;
 
   Future<QueueProcessResult> processUploadQueue();
+
+  /// Called when a single photo is successfully uploaded
+  void Function(String path)? get onUploadSuccess;
+  set onUploadSuccess(void Function(String path)? callback);
 }
 
 class UploadRepositoryImpl implements UploadRepository {
   @override
   final UploadPhotoQueueService uploadPhotoQueueService;
 
-  UploadRepositoryImpl({required this.uploadPhotoQueueService});
+  void Function(String path)? _onUploadSuccess;
+
+  @override
+  void Function(String path)? get onUploadSuccess => _onUploadSuccess;
+
+  @override
+  set onUploadSuccess(void Function(String path)? callback) {
+    _onUploadSuccess = callback;
+    uploadPhotoQueueService.onUploadSuccess = callback;
+  }
+
+  UploadRepositoryImpl({
+    required this.uploadPhotoQueueService,
+  });
 
   @override
   void addToQueue(String photos) {
