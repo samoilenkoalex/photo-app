@@ -1,168 +1,199 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
-import '../../../network/exception.dart';
+import '../../../network/api_client.dart';
 import '../../../network/network.dart';
+import '../models/queue_result.dart';
 
-/// A service that manages a queue for uploading photos with retry capabilities.
-/// Handles sequential photo uploads, tracks failed uploads, and implements
-/// retry logic for failed attempts.
+/// A service that manages photo upload queue with retry capabilities.
 class UploadPhotoQueueService {
-  // Internal queue to store paths of photos pending upload
+  final ApiClient _httpService;
+
+  /// Maximum number of retry attempts for failed uploads
+  final int _maxRetries;
+
+  /// Delay duration between retry attempts
+  final Duration _retryDelay;
+
+  /// Filename for persisting the main upload queue
+  static const String _queueFileName = 'upload_queue.json';
+
+  /// Filename for persisting the failed uploads list
+  static const String _failedUploadsFileName = 'failed_uploads.json';
+
+  /// Main queue storing paths of photos pending upload
   final List<String> _queue = [];
 
-  // Tracks photos that failed to upload after maximum retry attempts
+  /// List of photo paths that failed to upload after maximum retries
   final List<String> _failedUploads = [];
 
-  // Flag to prevent concurrent uploads
+  /// Queue of photos currently being processed
+  final List<String> _processingQueue = [];
+
+  /// Flag indicating if the queue is currently being processed
+  bool _isProcessing = false;
+
+  /// Flag indicating if an upload is currently in progress
   bool _isUploading = false;
 
-  /// Adds a photo path to the upload queue
-  /// [photo] The file path of the photo to be uploaded
-  void addToQueue(String photo) {
-    _queue.add(photo);
+  UploadPhotoQueueService({
+    ApiClient? httpService,
+    int maxRetries = 5,
+    Duration? retryDelay,
+  })  : _httpService = httpService ?? ApiClient(baseUrl: 'https://prioritysoftfile-upload-testap-production.up.railway.app'),
+        _maxRetries = maxRetries,
+        _retryDelay = retryDelay ?? const Duration(seconds: 2) {
+    _loadPersistedQueues();
   }
 
-  /// Returns the list of photos that failed to upload after all retry attempts
-  List<String> get failedUploads => _failedUploads;
+  /// Returns an unmodifiable list of photos that failed to upload after all retry attempts.
+  /// This prevents external modification of the internal list.
+  List<String> get failedUploads => List.unmodifiable(_failedUploads);
 
-  /// Returns the current queue of photos pending upload
-  List<String> get queue => _queue;
+  /// Returns an unmodifiable list of photos currently in the upload queue.
+  /// This prevents external modification of the internal queue.
+  List<String> get queue => List.unmodifiable(_queue);
 
-  /// Indicates whether a photo is currently being uploaded
-  bool get isUploading => _isUploading;
+  /// Indicates whether the queue is currently being processed.
+  bool get isProcessing => _isProcessing;
 
-  /// Processes the next photo in the upload queue if available and not currently uploading
-  /// Returns a NetworkResponse indicating the upload result
-  /// If queue is empty or upload is in progress, returns NetworkResponse.none()
-  Future<NetworkResponse<dynamic>> processUploadQueue() async {
-    if (_queue.isEmpty || _isUploading) return NetworkResponse.none();
+  /// Adds a photo path to the upload queue and persists the updated queue state.
+  /// The queue is automatically persisted to handle offline scenarios.
+  void addToQueue(String photo) {
+    _queue.add(photo);
+    _persistQueue();
+  }
+
+  /// Loads previously persisted queues from local storage.
+  Future<void> _loadPersistedQueues() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final queueFile = File('${directory.path}/$_queueFileName');
+      final failedUploadsFile = File('${directory.path}/$_failedUploadsFileName');
+
+      if (await queueFile.exists()) {
+        final queueData = await queueFile.readAsString();
+        final queueList = List<String>.from(jsonDecode(queueData));
+        _queue.addAll(queueList);
+        log('Loaded ${queueList.length} items from persisted queue');
+      }
+
+      if (await failedUploadsFile.exists()) {
+        final failedData = await failedUploadsFile.readAsString();
+        final failedList = List<String>.from(jsonDecode(failedData));
+        _failedUploads.addAll(failedList);
+        log('Loaded ${failedList.length} items from persisted failed uploads');
+      }
+    } catch (e) {
+      log('Error loading persisted queues: $e');
+    }
+  }
+
+  /// Persists the current state of both queues to local storage.
+  Future<void> _persistQueue() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final queueFile = File('${directory.path}/$_queueFileName');
+      final failedUploadsFile = File('${directory.path}/$_failedUploadsFileName');
+
+      await queueFile.writeAsString(jsonEncode(_queue));
+      await failedUploadsFile.writeAsString(jsonEncode(_failedUploads));
+      log('Persisted queue (${_queue.length} items) and failed uploads (${_failedUploads.length} items)');
+    } catch (e) {
+      log('Error persisting queues: $e');
+    }
+  }
+
+  /// Processes all photos in the upload queue sequentially.
+  Future<QueueProcessResult> processUploadQueue() async {
+    if (_queue.isEmpty || _isUploading) {
+      return QueueProcessResult(NetworkResponse.none(), 0);
+    }
 
     _isUploading = true;
+    NetworkResponse<dynamic> lastResponse = NetworkResponse.none();
+    int successCount = 0;
+
     try {
-      final photo = _queue.first;
-      return await _processPhoto(photo);
+      final itemsToProcess = List<String>.from(_queue);
+
+      for (final photo in itemsToProcess) {
+        lastResponse = await _uploadWithRetry(photo);
+
+        if (lastResponse.status == Status.completed) {
+          successCount++;
+          _queue.remove(photo);
+          await _persistQueue(); // Persist after each successful upload
+        } else {
+          break; // Stop processing on first failure
+        }
+      }
+
+      return QueueProcessResult(lastResponse, successCount);
     } finally {
       _isUploading = false;
     }
   }
 
-  /// Internal method to process a single photo upload
-  /// Handles the upload attempt and queue management based on the result
-  /// [photo] The file path of the photo to process
-  Future<NetworkResponse<dynamic>> _processPhoto(String photo) async {
-    try {
-      final uploadResponse = await uploadPhoto(photo);
-      if (uploadResponse.status == Status.completed) {
-        _queue.removeAt(0); // Remove successfully uploaded photo from queue
-      }
-      return uploadResponse;
-    } catch (e) {
-      return await retryFailedUploads(photo);
-    }
-  }
-
-  /// Attempts to upload a single photo to the server
-  /// [photo] The file path of the photo to upload
-  /// Returns NetworkResponse with the upload result
-  /// Throws various APIExceptions based on server response
-  Future<NetworkResponse<dynamic>> uploadPhoto(String photo) async {
-    log('Starting upload for photo: ${photo.split('/').last}');
-    // Constructs upload URL with candidate name as query parameter
-    final url = Uri.parse('https://prioritysoftfile-upload-testap-production.up.railway.app/upload').replace(queryParameters: {'candidateName': 'Alex Samoilenko'});
-
-    try {
-      // Prepare multipart request for file upload
-      final request = http.MultipartRequest('POST', url);
-      final file = File(photo);
-      final fileStream = http.ByteStream(file.openRead());
-      final length = await file.length();
-
-      // Create multipart file from photo
-      final multipartFile = http.MultipartFile(
-        'file',
-        fileStream,
-        length,
-        filename: file.path.split('/').last,
-      );
-
-      request.files.add(multipartFile);
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      log('Upload response: Status ${response.statusCode}, Body: $responseBody');
-
-      // Handle response based on status code
-      if (response.statusCode == 200) {
-        return NetworkResponse.completed(response);
-      } else {
-        switch (response.statusCode) {
-          case 400:
-            throw BadRequestException(responseBody);
-          case 401:
-          case 403:
-            throw UnauthorisedException(responseBody);
-          default:
-            throw FetchDataException('Error occurred while uploading: ${response.statusCode}');
-        }
-      }
-    } catch (e) {
-      log('Upload error: $e');
-      if (e is APIException) {
-        return NetworkResponse.error(e.toString());
-      }
-      return NetworkResponse.error('Failed to upload photo: $e');
-    }
-  }
-
-  /// Implements retry logic for failed uploads
-  /// Makes up to 5 attempts to upload the photo with 2-second delays between attempts
-  /// [photo] The file path of the photo to retry uploading
-  /// Returns NetworkResponse with final upload result
-  Future<NetworkResponse<dynamic>> retryFailedUploads(String photo) async {
-    int retryCount = 0;
-    const maxRetries = 5;
+  /// Handles the upload of a single photo with retry logic.
+  Future<NetworkResponse<dynamic>> _uploadWithRetry(String photo) async {
     NetworkResponse<dynamic> lastResponse;
+    int attempts = 0;
 
-    while (retryCount < maxRetries) {
+    log('Starting upload with retry for ${photo.split('/').last}');
+    do {
       try {
-        log('Retry attempt ${retryCount + 1} for photo: ${photo.split('/').last}');
-        lastResponse = await uploadPhoto(photo);
+        lastResponse = await _uploadPhoto(photo);
 
         if (lastResponse.status == Status.completed) {
-          _queue.removeAt(0); // Remove successfully uploaded photo
           return lastResponse;
         }
 
-        retryCount++;
-        if (retryCount == maxRetries) {
-          log('Max retries reached, moving photo to failed uploads');
-          _failedUploads.add(photo);
-          _queue.removeAt(0);
-          return NetworkResponse.error('Failed after $maxRetries retry attempts');
+        log('Upload attempt ${attempts + 1} failed for ${photo.split('/').last}');
+        if (attempts + 1 < _maxRetries) {
+          log('Retrying in ${_retryDelay.inSeconds} seconds...');
         }
-
-        await Future<void>.delayed(const Duration(seconds: 2)); // Wait before retrying
+        await Future<void>.delayed(_retryDelay);
       } catch (e) {
-        retryCount++;
-        log('Retry attempt $retryCount failed: $e');
-
-        if (retryCount == maxRetries) {
-          _failedUploads.add(photo);
-          _queue.removeAt(0);
-          return NetworkResponse.error('Failed after $maxRetries retry attempts: $e');
+        lastResponse = NetworkResponse.error(e.toString());
+        log('Upload error on attempt ${attempts + 1}: $e');
+        if (attempts + 1 < _maxRetries) {
+          log('Retrying in ${_retryDelay.inSeconds} seconds...');
         }
-        await Future<void>.delayed(const Duration(seconds: 2));
+        await Future<void>.delayed(_retryDelay);
       }
-    }
 
-    return NetworkResponse.error('Upload failed after all retry attempts');
+      attempts++;
+    } while (attempts < _maxRetries);
+
+    // Handle final failure
+    log('All retry attempts exhausted for ${photo.split('/').last}');
+    _failedUploads.add(photo);
+    _queue.remove(photo);
+    return NetworkResponse.error('Failed after $_maxRetries attempts');
   }
 
-  /// Clears the list of failed uploads
-  void clearFailedUploads() {
-    _failedUploads.clear();
+  /// Performs the actual HTTP upload request for a single photo.
+  Future<NetworkResponse<dynamic>> _uploadPhoto(String photo) async {
+    final result = await _httpService.uploadFile(
+      '/upload',
+      File(photo),
+      queryParams: {'candidateName': 'Alex Samoilenko'},
+    );
+
+    log('Upload result for ${photo.split('/').last}: $result');
+    return result;
+  }
+
+  /// Cancels all pending uploads and clears both queues.
+  void cancelAll() {
+    _queue.clear();
+    _processingQueue.clear();
+    _isProcessing = false;
+    _isUploading = false;
+    _persistQueue(); // Persist the cleared state
   }
 }

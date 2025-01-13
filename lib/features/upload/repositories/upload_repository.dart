@@ -1,4 +1,4 @@
-import '../../../network/network.dart';
+import '../models/queue_result.dart';
 import '../services/upload_photo_queue.dart';
 
 abstract class UploadRepository {
@@ -12,11 +12,7 @@ abstract class UploadRepository {
 
   List<String> get queue;
 
-  bool get isUploading;
-
-  Future<NetworkResponse<dynamic>?> processUploadQueue();
-
-  void clearFailedUploads();
+  Future<QueueProcessResult> processUploadQueue();
 }
 
 class UploadRepositoryImpl implements UploadRepository {
@@ -37,15 +33,7 @@ class UploadRepositoryImpl implements UploadRepository {
   List<String> get queue => uploadPhotoQueueService.queue;
 
   @override
-  bool get isUploading => uploadPhotoQueueService.isUploading;
-
-  @override
-  Future<NetworkResponse<dynamic>?> processUploadQueue() async {
+  Future<QueueProcessResult> processUploadQueue() async {
     return await uploadPhotoQueueService.processUploadQueue();
-  }
-
-  @override
-  void clearFailedUploads() {
-    uploadPhotoQueueService.clearFailedUploads();
   }
 }
