@@ -63,7 +63,7 @@ class UploaderCubit extends Cubit<UploaderState> {
   ///
   /// Parameters:
   /// - photo: String identifier or path of the photo to be uploaded
-  Future<void> addPhotos(String photo) async {
+  Future<void> addPhoto(String photo) async {
     // Add photo to the repository's queue
     _uploadRepository.addToQueue(photo);
 
@@ -93,26 +93,23 @@ class UploaderCubit extends Cubit<UploaderState> {
     // Guard clause: exit if not currently uploading
     if (!state.isUploading) return;
 
-    // Update state to show upload in progress
     emit(state.copyWith(connectionStatus: ConnectionStatus.uploading));
 
     try {
-      // Attempt to process the next item in the queue
-      final result = await _uploadRepository.processUploadQueue();
+      // Continue processing while there are items in the queue
+      while (_uploadRepository.queue.isNotEmpty && state.isUploading) {
+        final result = await _uploadRepository.processUploadQueue();
 
-      if (result != null) {
-        if (result.status == Status.completed) {
-          // Handle successful upload
+        if (result.response.status == Status.completed) {
           emit(
             state.copyWith(
-              queue: _uploadRepository.queue, // Update queue state
-              successfulUploads: state.successfulUploads + 1,
+              queue: _uploadRepository.queue,
+              successfulUploads: state.successfulUploads + result.successCount,
               isUploading: _uploadRepository.queue.isNotEmpty,
             ),
           );
-          log('Successful upload - Updated count: ${state.successfulUploads + 1}');
+          log('Successful uploads - Updated count: ${state.successfulUploads + result.successCount}');
         } else {
-          // Handle failed upload
           emit(
             state.copyWith(
               queue: _uploadRepository.queue,
@@ -120,6 +117,8 @@ class UploaderCubit extends Cubit<UploaderState> {
               isUploading: _uploadRepository.queue.isNotEmpty,
             ),
           );
+          // Break the loop if upload failed
+          break;
         }
       }
 
@@ -130,7 +129,6 @@ class UploaderCubit extends Cubit<UploaderState> {
         ),
       );
     } catch (e) {
-      // Log any errors and update state
       log('Process queue error: $e');
       emit(
         state.copyWith(

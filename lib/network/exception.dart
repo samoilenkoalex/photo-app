@@ -25,3 +25,7 @@ class UnauthorisedException extends APIException {
 class InvalidInputException extends APIException {
   InvalidInputException([String? message]) : super(message, 'Invalid Input: ');
 }
+
+class NotFoundException extends APIException {
+  NotFoundException([String? message]) : super(message, 'Not Found: ');
+}

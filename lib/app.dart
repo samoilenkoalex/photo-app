@@ -20,7 +20,7 @@ class Application extends StatelessWidget {
         listenWhen: (previous, current) => current.newPhoto != null && current.newPhoto != previous.newPhoto,
         listener: (context, state) {
           if (state.photos.isNotEmpty) {
-            context.read<UploaderCubit>().addPhotos(state.newPhoto!);
+            context.read<UploaderCubit>().addPhoto(state.newPhoto!);
           }
         },
         child: const CameraScreen(),
