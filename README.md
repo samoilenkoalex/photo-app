@@ -9,6 +9,7 @@ A Flutter application for capturing and uploading photos with offline support an
 
 ## Preview
 
+
 **Internet connected**
 
 https://github.com/user-attachments/assets/9b77276b-26e4-45bc-a742-44d6234f41ea
