@@ -1,6 +1,6 @@
 # Photo App
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)]()
-[![Maintaner](https://img.shields.io/static/v1?label=Oleksandr%20Samoilenko&message=Maintainer&color=red)](mailto:oleksandr.samoilenko@extrawest.com)
+[![Maintaner](https://img.shields.io/static/v1?label=Oleksandr%20Samoilenko&message=Maintainer&color=red)](mailto:oleksandr.samoileko@gmail.com)
 [![Ask Me Anything !](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)]()
 ![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)
 ![GitHub release](https://img.shields.io/badge/release-v1.0.0-blue)
@@ -163,6 +163,4 @@ The app monitors network connectivity and:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-Created by Oleksandr Samoilenko
-
-[Extrawest.com](https://www.extrawest.com), 2025
+Created by Oleksandr Samoilenko, 2025
